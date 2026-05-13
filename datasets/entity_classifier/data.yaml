@@ -1,4 +1,4 @@
-path: datasets/entity_detector
+path: c:/Users/drew3/Github/Everdell_Analysis/datasets/entity_classifier
 train: images/train
 val: images/val
 test: images/test

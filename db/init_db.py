@@ -23,6 +23,8 @@ class EverdellDB:
                 card_type TEXT CHECK (card_type IN ('critter', 'construction')),
                 color TEXT,
                 expansion TEXT,
+                base_points INTEGER DEFAULT 0,
+                scoring_rule TEXT DEFAULT '',
                 notes TEXT DEFAULT ''
             )
         """)
@@ -36,6 +38,14 @@ class EverdellDB:
             )
         """)
 
+        # additive migration for pre-existing DBs
+        cur.execute("PRAGMA table_info(card_data)")
+        existing_cols = {row[1] for row in cur.fetchall()}
+        if "base_points" not in existing_cols:
+            cur.execute("ALTER TABLE card_data ADD COLUMN base_points INTEGER DEFAULT 0")
+        if "scoring_rule" not in existing_cols:
+            cur.execute("ALTER TABLE card_data ADD COLUMN scoring_rule TEXT DEFAULT ''")
+
         conn.commit()
         conn.close()
 
@@ -47,14 +57,16 @@ class EverdellDB:
         card_type: str,
         color: str,
         expansion: str,
+        base_points: int = 0,
+        scoring_rule: str = "",
         notes: str = ""
     ):
         conn = self._connect()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO card_data (name, description, rarity, card_type, color, expansion, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (name, description, rarity, card_type, color, expansion, notes))
+            INSERT INTO card_data (name, description, rarity, card_type, color, expansion, base_points, scoring_rule, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (name, description, rarity, card_type, color, expansion, base_points, scoring_rule, notes))
         conn.commit()
         conn.close()
 

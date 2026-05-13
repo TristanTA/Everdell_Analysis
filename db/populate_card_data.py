@@ -15,6 +15,16 @@ def normalize(value):
     return str(value).strip()
 
 
+def normalize_int(value, default=0):
+    s = normalize(value)
+    if s == "":
+        return default
+    try:
+        return int(s)
+    except ValueError:
+        return default
+
+
 def row_from_csv(csv_row):
     return {
         "name": normalize(csv_row.get("name")),
@@ -23,6 +33,7 @@ def row_from_csv(csv_row):
         "card_type": normalize(csv_row.get("card_type")).lower(),
         "color": normalize(csv_row.get("color")).lower(),
         "expansion": normalize(csv_row.get("expansion")).lower(),
+        "base_points": normalize_int(csv_row.get("base_points")),
         "notes": normalize(csv_row.get("notes")),
     }
 
@@ -30,7 +41,7 @@ def row_from_csv(csv_row):
 def get_db_cards(conn):
     cur = conn.cursor()
     cur.execute("""
-        SELECT name, description, rarity, card_type, color, expansion, notes
+        SELECT name, description, rarity, card_type, color, expansion, base_points, notes
         FROM card_data
     """)
     rows = cur.fetchall()
@@ -44,7 +55,8 @@ def get_db_cards(conn):
             "card_type": normalize(row[3]).lower(),
             "color": normalize(row[4]).lower(),
             "expansion": normalize(row[5]).lower(),
-            "notes": normalize(row[6]),
+            "base_points": int(row[6]) if row[6] is not None else 0,
+            "notes": normalize(row[7]),
         }
     return cards
 
@@ -68,7 +80,7 @@ def sync_card_data(csv_path=CSV_PATH, db_path=DB_PATH):
     with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
 
-        required = {"name", "description", "rarity", "card_type", "color", "expansion", "notes"}
+        required = {"name", "description", "rarity", "card_type", "color", "expansion", "base_points", "notes"}
         missing = required - set(reader.fieldnames or [])
         if missing:
             raise ValueError(f"CSV missing required columns: {sorted(missing)}")
@@ -84,8 +96,8 @@ def sync_card_data(csv_path=CSV_PATH, db_path=DB_PATH):
             if existing is None:
                 cur.execute("""
                     INSERT INTO card_data (
-                        name, description, rarity, card_type, color, expansion, notes
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        name, description, rarity, card_type, color, expansion, base_points, notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     card["name"],
                     card["description"],
@@ -93,6 +105,7 @@ def sync_card_data(csv_path=CSV_PATH, db_path=DB_PATH):
                     card["card_type"],
                     card["color"],
                     card["expansion"],
+                    card["base_points"],
                     card["notes"],
                 ))
                 inserted += 1
@@ -100,7 +113,7 @@ def sync_card_data(csv_path=CSV_PATH, db_path=DB_PATH):
 
             fields_changed = any(
                 existing[key] != card[key]
-                for key in ["description", "rarity", "card_type", "color", "expansion", "notes"]
+                for key in ["description", "rarity", "card_type", "color", "expansion", "base_points", "notes"]
             )
 
             if fields_changed:
@@ -111,6 +124,7 @@ def sync_card_data(csv_path=CSV_PATH, db_path=DB_PATH):
                         card_type = ?,
                         color = ?,
                         expansion = ?,
+                        base_points = ?,
                         notes = ?
                     WHERE name = ?
                 """, (
@@ -119,6 +133,7 @@ def sync_card_data(csv_path=CSV_PATH, db_path=DB_PATH):
                     card["card_type"],
                     card["color"],
                     card["expansion"],
+                    card["base_points"],
                     card["notes"],
                     card["name"],
                 ))
